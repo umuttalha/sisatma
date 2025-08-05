@@ -10,7 +10,6 @@ function RootComponent() {
   return (
     <div className="min-h-screen bg-background">
       <header className='flex items-center justify-between p-4 border-b'>
-        <h1 className='text-xl font-semibold'>Time Tracker</h1>
         <div className='flex items-center space-x-4'>
           <nav className='flex space-x-1 bg-muted p-1 rounded-lg'>
             <Link 
@@ -38,8 +37,9 @@ function RootComponent() {
               Dashboard
             </Link>
           </nav>
-          <ModeToggle />
         </div>
+          <ModeToggle />
+
       </header>
       
       <main className="container mx-auto p-6">

@@ -1,4 +1,4 @@
-// index.jsx - Complete Timer page with dynamic tags
+// index.jsx - Complete Timer page with background lines
 import { createFileRoute } from '@tanstack/react-router'
 import React, { useState, useEffect } from 'react'
 import { Play, Pause, Square, RotateCcw, Clock, Timer as TimerIcon, Plus, X, Edit2, Check } from 'lucide-react'
@@ -46,6 +46,18 @@ function TimerPage() {
     const savedTags = localStorage.getItem('userTags')
     return savedTags ? JSON.parse(savedTags) : ['Other']
   })
+  const [timerStartTime, setTimerStartTime] = useState(() => {
+    return parseInt(localStorage.getItem('timerStartTime')) || 0
+  })
+  const [stopwatchStartTime, setStopwatchStartTime] = useState(() => {
+    return parseInt(localStorage.getItem('stopwatchStartTime')) || 0
+  })
+  const [timerPausedTime, setTimerPausedTime] = useState(() => {
+    return parseInt(localStorage.getItem('timerPausedTime')) || 0
+  })
+  const [stopwatchPausedTime, setStopwatchPausedTime] = useState(() => {
+    return parseInt(localStorage.getItem('stopwatchPausedTime')) || 0
+  })
   const [editingTask, setEditingTask] = useState(null)
   const [newTagName, setNewTagName] = useState('')
   const [showTagManager, setShowTagManager] = useState(false)
@@ -90,6 +102,22 @@ function TimerPage() {
   useEffect(() => {
     localStorage.setItem('selectedTag', selectedTag)
   }, [selectedTag])
+
+  useEffect(() => {
+    localStorage.setItem('timerStartTime', timerStartTime.toString())
+  }, [timerStartTime])
+
+  useEffect(() => {
+    localStorage.setItem('stopwatchStartTime', stopwatchStartTime.toString())
+  }, [stopwatchStartTime])
+
+  useEffect(() => {
+    localStorage.setItem('timerPausedTime', timerPausedTime.toString())
+  }, [timerPausedTime])
+
+  useEffect(() => {
+    localStorage.setItem('stopwatchPausedTime', stopwatchPausedTime.toString())
+  }, [stopwatchPausedTime])
 
   // Timer countdown
   useEffect(() => {
@@ -169,9 +197,18 @@ function TimerPage() {
   const saveCompletedTask = (type) => {
     if (!currentTask.trim()) return
 
-    const duration = type === 'timer' 
-      ? (25 * 60) - (timerMinutes * 60 + timerSeconds)
-      : stopwatchTime
+    let duration = 0
+    if (type === 'timer') {
+      // Calculate actual elapsed time from start
+      const originalTime = timerStartTime || (25 * 60)
+      const remainingTime = timerMinutes * 60 + timerSeconds
+      duration = originalTime - remainingTime
+    } else {
+      duration = stopwatchTime
+    }
+
+    // Only save if there's actual time spent
+    if (duration <= 0) return
 
     const newTask = {
       id: Date.now(),
@@ -189,8 +226,17 @@ function TimerPage() {
 
   const startTimer = () => {
     if (currentTask.trim()) {
+      // Store the original timer duration when starting
+      if (!isTimerRunning && timerStartTime === 0) {
+        setTimerStartTime(timerMinutes * 60 + timerSeconds)
+      }
       setIsTimerRunning(true)
     }
+  }
+
+  const pauseTimer = () => {
+    setIsTimerRunning(false)
+    // Don't save task when pausing, just pause
   }
 
   const stopTimer = () => {
@@ -198,12 +244,16 @@ function TimerPage() {
     if (currentTask.trim()) {
       saveCompletedTask('timer')
     }
+    // Reset timer to original values and clear start time
+    resetTimer()
   }
 
   const resetTimer = () => {
     setIsTimerRunning(false)
     setTimerMinutes(25)
     setTimerSeconds(0)
+    setTimerStartTime(0)
+    setTimerPausedTime(0)
   }
 
   const startStopwatch = () => {
@@ -212,16 +262,25 @@ function TimerPage() {
     }
   }
 
+  const pauseStopwatch = () => {
+    setIsStopwatchRunning(false)
+    // Don't save task when pausing, just pause
+  }
+
   const stopStopwatch = () => {
     setIsStopwatchRunning(false)
     if (currentTask.trim()) {
       saveCompletedTask('stopwatch')
     }
+    // Reset stopwatch after stopping
+    resetStopwatch()
   }
 
   const resetStopwatch = () => {
     setIsStopwatchRunning(false)
     setStopwatchTime(0)
+    setStopwatchStartTime(0)
+    setStopwatchPausedTime(0)
   }
 
   const deleteTask = (taskToDelete) => {
@@ -419,6 +478,14 @@ function TimerPage() {
                 <span>Start</span>
               </button>
               <button
+                onClick={pauseTimer}
+                disabled={!isTimerRunning}
+                className="flex items-center space-x-2 px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Pause size={20} />
+                <span>Pause</span>
+              </button>
+              <button
                 onClick={stopTimer}
                 disabled={!isTimerRunning}
                 className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -437,12 +504,20 @@ function TimerPage() {
           ) : (
             <>
               <button
-                onClick={isStopwatchRunning ? () => setIsStopwatchRunning(false) : startStopwatch}
-                disabled={!isStopwatchRunning && !currentTask.trim()}
-                className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={startStopwatch}
+                disabled={isStopwatchRunning || !currentTask.trim()}
+                className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isStopwatchRunning ? <Pause size={20} /> : <Play size={20} />}
-                <span>{isStopwatchRunning ? 'Pause' : 'Start'}</span>
+                <Play size={20} />
+                <span>Start</span>
+              </button>
+              <button
+                onClick={pauseStopwatch}
+                disabled={!isStopwatchRunning}
+                className="flex items-center space-x-2 px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Pause size={20} />
+                <span>Pause</span>
               </button>
               <button
                 onClick={stopStopwatch}
