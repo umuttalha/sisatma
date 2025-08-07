@@ -31,14 +31,14 @@ function DashboardPage() {
     return TAG_COLORS[colorIndex]
   }
 
-  const formatTimeMinutes = (totalSeconds) => {
+const formatTimeMinutes = (totalSeconds) => {
     const minutes = Math.floor(totalSeconds / 60)
-    const seconds = totalSeconds % 60
+    const seconds = Math.floor(totalSeconds % 60)
     if (minutes === 0) {
       return `${seconds}s`
     }
     return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`
-  }
+}
 
   const formatMinutesOnly = (totalSeconds) => {
     return Math.floor(totalSeconds / 60)

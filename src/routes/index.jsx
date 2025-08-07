@@ -1,4 +1,4 @@
-// index.jsx - Complete Timer page with background lines
+// index.jsx - Complete Timer page with responsive design
 import { createFileRoute } from '@tanstack/react-router'
 import React, { useState, useEffect } from 'react'
 import { Play, Pause, Square, RotateCcw, Clock, Timer as TimerIcon, Plus, X, Edit2, Check } from 'lucide-react'
@@ -50,7 +50,8 @@ function TimerPage() {
     return parseInt(localStorage.getItem('timerStartTime')) || 0
   })
   const [stopwatchStartTime, setStopwatchStartTime] = useState(() => {
-    return parseInt(localStorage.getItem('stopwatchStartTime')) || 0
+    const saved = localStorage.getItem('stopwatchStartTime')
+    return saved ? parseInt(saved) : null
   })
   const [timerPausedTime, setTimerPausedTime] = useState(() => {
     return parseInt(localStorage.getItem('timerPausedTime')) || 0
@@ -108,7 +109,11 @@ function TimerPage() {
   }, [timerStartTime])
 
   useEffect(() => {
-    localStorage.setItem('stopwatchStartTime', stopwatchStartTime.toString())
+    if (stopwatchStartTime !== null) {
+      localStorage.setItem('stopwatchStartTime', stopwatchStartTime.toString())
+    } else {
+      localStorage.removeItem('stopwatchStartTime')
+    }
   }, [stopwatchStartTime])
 
   useEffect(() => {
@@ -142,12 +147,18 @@ function TimerPage() {
   useEffect(() => {
     let interval
     if (isStopwatchRunning) {
+      const now = Date.now()
+      if (!stopwatchStartTime) {
+        setStopwatchStartTime(now)
+      }
+      
       interval = setInterval(() => {
-        setStopwatchTime(time => time + 1)
+        const elapsed = Math.floor((Date.now() - stopwatchStartTime) / 1000)
+        setStopwatchTime(stopwatchPausedTime + elapsed)
       }, 1000)
     }
     return () => clearInterval(interval)
-  }, [isStopwatchRunning])
+  }, [isStopwatchRunning, stopwatchStartTime, stopwatchPausedTime])
 
   const formatTime = (totalSeconds) => {
     const hours = Math.floor(totalSeconds / 3600)
@@ -259,12 +270,14 @@ function TimerPage() {
   const startStopwatch = () => {
     if (currentTask.trim()) {
       setIsStopwatchRunning(true)
+      setStopwatchStartTime(Date.now())
     }
   }
 
   const pauseStopwatch = () => {
     setIsStopwatchRunning(false)
-    // Don't save task when pausing, just pause
+    setStopwatchPausedTime(stopwatchTime)
+    setStopwatchStartTime(null)
   }
 
   const stopStopwatch = () => {
@@ -272,14 +285,13 @@ function TimerPage() {
     if (currentTask.trim()) {
       saveCompletedTask('stopwatch')
     }
-    // Reset stopwatch after stopping
     resetStopwatch()
   }
 
   const resetStopwatch = () => {
     setIsStopwatchRunning(false)
     setStopwatchTime(0)
-    setStopwatchStartTime(0)
+    setStopwatchStartTime(null)
     setStopwatchPausedTime(0)
   }
 
@@ -308,308 +320,333 @@ function TimerPage() {
   const tagTotals = getTotalTimeByTag()
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      {/* Tab Navigation */}
-      <div className="flex space-x-1 bg-muted p-1 rounded-lg w-fit mx-auto">
-        <button
-          onClick={() => setActiveTab('timer')}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'timer'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <TimerIcon size={16} />
-          <span>Timer</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('stopwatch')}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'stopwatch'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Clock size={16} />
-          <span>Stopwatch</span>
-        </button>
-      </div>
-
-      {/* Timer/Stopwatch Display */}
-      <div className="text-center space-y-6">
-        {/* Timer Input Controls */}
-        {activeTab === 'timer' && (
-          <div className="flex justify-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium">Minutes:</label>
-              <input
-                type="number"
-                min="0"
-                max="999"
-                value={timerMinutes}
-                onChange={(e) => {
-                  if (!isTimerRunning) {
-                    setTimerMinutes(parseInt(e.target.value) || 0)
-                  }
-                }}
-                disabled={isTimerRunning}
-                className="w-20 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium">Seconds:</label>
-              <input
-                type="number"
-                min="0"
-                max="59"
-                value={timerSeconds}
-                onChange={(e) => {
-                  if (!isTimerRunning) {
-                    setTimerSeconds(parseInt(e.target.value) || 0)
-                  }
-                }}
-                disabled={isTimerRunning}
-                className="w-20 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
-              />
-            </div>
+    <div className="min-h-screen bg-background px-4 py-4 sm:py-6 md:py-8">
+      <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8">
+        {/* Tab Navigation */}
+        <div className="flex justify-center">
+          <div className="flex space-x-1 bg-muted p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab('timer')}
+              className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'timer'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <TimerIcon size={16} />
+              <span className="hidden sm:inline">Timer</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('stopwatch')}
+              className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'stopwatch'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Clock size={16} />
+              <span className="hidden sm:inline">Stopwatch</span>
+            </button>
           </div>
-        )}
-
-        <div className="text-8xl font-mono font-bold text-primary">
-          {activeTab === 'timer'
-            ? `${timerMinutes.toString().padStart(2, '0')}:${timerSeconds.toString().padStart(2, '0')}`
-            : formatTime(stopwatchTime)
-          }
         </div>
 
-        {/* Task Input */}
-        <div className="space-y-4 max-w-md mx-auto">
-          <input
-            type="text"
-            placeholder="What are you working on?"
-            value={currentTask}
-            onChange={(e) => setCurrentTask(e.target.value)}
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          
-          <select
-            value={selectedTag}
-            onChange={(e) => setSelectedTag(e.target.value)}
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            {userTags.map(tag => (
-              <option key={tag} value={tag}>{tag}</option>
-            ))}
-          </select>
-
-          <button
-            onClick={() => setShowTagManager(!showTagManager)}
-            className="w-full px-4 py-2 border border-dashed rounded-lg hover:bg-muted transition-colors text-sm"
-          >
-            Manage Tags
-          </button>
-
-          {showTagManager && (
-            <div className="border rounded-lg p-4 space-y-3">
-              <div className="flex space-x-2">
+        {/* Timer/Stopwatch Display */}
+        <div className="text-center space-y-4 sm:space-y-6">
+          {/* Timer Input Controls */}
+          {activeTab === 'timer' && (
+            <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
+              <div className="flex items-center justify-center space-x-2">
+                <label className="text-sm font-medium whitespace-nowrap">Minutes:</label>
                 <input
-                  type="text"
-                  placeholder="New tag name"
-                  value={newTagName}
-                  onChange={(e) => setNewTagName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      addNewTag()
+                  type="number"
+                  min="0"
+                  max="999"
+                  value={timerMinutes}
+                  onChange={(e) => {
+                    if (!isTimerRunning) {
+                      setTimerMinutes(parseInt(e.target.value) || 0)
                     }
                   }}
-                  className="flex-1 px-3 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  disabled={isTimerRunning}
+                  className="w-16 sm:w-20 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-center"
                 />
-                <button
-                  onClick={addNewTag}
-                  className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                >
-                  <Plus size={16} />
-                </button>
               </div>
-              
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Current Tags:</div>
-                <div className="flex flex-wrap gap-2">
-                  {userTags.map(tag => (
-                    <div
-                      key={tag}
-                      className="flex items-center space-x-1 px-2 py-1 rounded text-sm border"
-                      style={{ 
-                        backgroundColor: getTagBackground(tag),
-                        borderColor: getTagColor(tag)
-                      }}
-                    >
-                      <div
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: getTagColor(tag) }}
-                      />
-                      <span>{tag}</span>
-                      {tag !== 'Other' && (
-                        <button
-                          onClick={() => removeTag(tag)}
-                          className="ml-1 hover:text-red-500"
-                        >
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+              <div className="flex items-center justify-center space-x-2">
+                <label className="text-sm font-medium whitespace-nowrap">Seconds:</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={timerSeconds}
+                  onChange={(e) => {
+                    if (!isTimerRunning) {
+                      setTimerSeconds(parseInt(e.target.value) || 0)
+                    }
+                  }}
+                  disabled={isTimerRunning}
+                  className="w-16 sm:w-20 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-center"
+                />
               </div>
             </div>
           )}
-        </div>
 
-        {/* Controls */}
-        <div className="flex justify-center space-x-4">
-          {activeTab === 'timer' ? (
-            <>
-              <button
-                onClick={startTimer}
-                disabled={isTimerRunning || !currentTask.trim()}
-                className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Play size={20} />
-                <span>Start</span>
-              </button>
-              <button
-                onClick={pauseTimer}
-                disabled={!isTimerRunning}
-                className="flex items-center space-x-2 px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Pause size={20} />
-                <span>Pause</span>
-              </button>
-              <button
-                onClick={stopTimer}
-                disabled={!isTimerRunning}
-                className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Square size={20} />
-                <span>Stop</span>
-              </button>
-              <button
-                onClick={resetTimer}
-                className="flex items-center space-x-2 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                <RotateCcw size={20} />
-                <span>Reset</span>
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={startStopwatch}
-                disabled={isStopwatchRunning || !currentTask.trim()}
-                className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Play size={20} />
-                <span>Start</span>
-              </button>
-              <button
-                onClick={pauseStopwatch}
-                disabled={!isStopwatchRunning}
-                className="flex items-center space-x-2 px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Pause size={20} />
-                <span>Pause</span>
-              </button>
-              <button
-                onClick={stopStopwatch}
-                disabled={!isStopwatchRunning}
-                className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Square size={20} />
-                <span>Stop</span>
-              </button>
-              <button
-                onClick={resetStopwatch}
-                className="flex items-center space-x-2 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                <RotateCcw size={20} />
-                <span>Reset</span>
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Tag Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {userTags.map(tag => (
-          <div
-            key={tag}
-            className="p-4 rounded-lg border"
-            style={{ backgroundColor: getTagBackground(tag) }}
-          >
-            <div className="text-sm font-medium" style={{ color: getTagColor(tag) }}>
-              {tag}
-            </div>
-            <div className="text-2xl font-bold" style={{ color: getTagColor(tag) }}>
-              {formatTime(tagTotals[tag] || 0)}
-            </div>
+          {/* Main Timer Display */}
+          <div className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-mono font-bold text-primary break-all">
+            {activeTab === 'timer'
+              ? `${timerMinutes.toString().padStart(2, '0')}:${timerSeconds.toString().padStart(2, '0')}`
+              : formatTime(stopwatchTime)
+            }
           </div>
-        ))}
-      </div>
 
-      {/* Recent Tasks */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Recent Tasks</h2>
-        <div className="space-y-2 max-h-60 overflow-y-auto">
-          {tasks.slice(-10).reverse().map(task => {
-            return (
-              <div key={task.id} className="flex items-center justify-between p-3 bg-card rounded-lg border">
-                <div className="flex items-center space-x-3 flex-1">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: getTagColor(task.tag) }}
-                  />
-                  {editingTask === task.id ? (
+          {/* Task Input Section */}
+          <div className="space-y-3 sm:space-y-4 max-w-md mx-auto">
+            <input
+              type="text"
+              placeholder="What are you working on?"
+              value={currentTask}
+              onChange={(e) => setCurrentTask(e.target.value)}
+              className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base"
+            />
+            
+            <select
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+              className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base"
+            >
+              {userTags.map(tag => (
+                <option key={tag} value={tag}>{tag}</option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => setShowTagManager(!showTagManager)}
+              className="w-full px-3 sm:px-4 py-2 border border-dashed rounded-lg hover:bg-muted transition-colors text-sm"
+            >
+              Manage Tags
+            </button>
+
+            {showTagManager && (
+              <div className="border rounded-lg p-3 sm:p-4 space-y-3 bg-muted/50">
+                {/* Add new tag section */}
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Add New Tag:</div>
+                  <div className="flex gap-2">
                     <input
                       type="text"
-                      defaultValue={task.task}
+                      placeholder="Enter tag name"
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
-                          editTask(task.id, e.target.value)
-                        }
-                        if (e.key === 'Escape') {
-                          setEditingTask(null)
+                          addNewTag()
                         }
                       }}
-                      onBlur={(e) => editTask(task.id, e.target.value)}
-                      className="flex-1 px-2 py-1 border rounded"
-                      autoFocus
+                      className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary min-w-0"
                     />
-                  ) : (
-                    <span className="flex-1">{task.task}</span>
-                  )}
-                  <span className="text-sm text-muted-foreground">
-                    {formatTime(task.duration)}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{task.date}</span>
+                    <button
+                      onClick={addNewTag}
+                      disabled={!newTagName.trim() || userTags.includes(newTagName.trim())}
+                      className="px-3 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 flex items-center"
+                    >
+                      <Plus size={16} />
+                      <span className="hidden sm:inline sm:ml-1">Add</span>
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                
+                {/* Current tags section */}
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Current Tags:</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {userTags.map(tag => (
+                      <div
+                        key={tag}
+                        className="flex items-center justify-between p-2 rounded-md border min-w-0"
+                        style={{ 
+                          backgroundColor: getTagBackground(tag),
+                          borderColor: getTagColor(tag)
+                        }}
+                      >
+                        <div className="flex items-center space-x-2 min-w-0 flex-1">
+                          <div
+                            className="w-3 h-3 rounded-full shrink-0"
+                            style={{ backgroundColor: getTagColor(tag) }}
+                          />
+                          <span className="text-sm truncate font-medium">{tag}</span>
+                        </div>
+                        {tag !== 'Other' && (
+                          <button
+                            onClick={() => removeTag(tag)}
+                            className="ml-2 p-1 hover:bg-red-100 hover:text-red-700 rounded shrink-0 transition-colors"
+                            title={`Remove ${tag} tag`}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Close button for mobile */}
+                <div className="pt-2 border-t sm:hidden">
                   <button
-                    onClick={() => setEditingTask(task.id)}
-                    className="p-1 hover:bg-muted rounded"
+                    onClick={() => setShowTagManager(false)}
+                    className="w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                   >
-                    <Edit2 size={14} />
-                  </button>
-                  <button
-                    onClick={() => deleteTask(task)}
-                    className="p-1 hover:bg-muted rounded text-red-500"
-                  >
-                    <X size={14} />
+                    Close
                   </button>
                 </div>
               </div>
-            )
-          })}
+            )}
+          </div>
+
+          {/* Controls - Responsive layout */}
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 md:gap-4 px-2">
+            {activeTab === 'timer' ? (
+              <>
+                <button
+                  onClick={startTimer}
+                  disabled={isTimerRunning || !currentTask.trim()}
+                  className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                >
+                  <Play size={16} className="sm:w-5 sm:h-5" />
+                  <span>Start</span>
+                </button>
+                <button
+                  onClick={pauseTimer}
+                  disabled={!isTimerRunning}
+                  className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                >
+                  <Pause size={16} className="sm:w-5 sm:h-5" />
+                  <span>Pause</span>
+                </button>
+                <button
+                  onClick={stopTimer}
+                  disabled={!isTimerRunning}
+                  className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                >
+                  <Square size={16} className="sm:w-5 sm:h-5" />
+                  <span>Stop</span>
+                </button>
+                <button
+                  onClick={resetTimer}
+                  className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm sm:text-base"
+                >
+                  <RotateCcw size={16} className="sm:w-5 sm:h-5" />
+                  <span>Reset</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={startStopwatch}
+                  disabled={isStopwatchRunning || !currentTask.trim()}
+                  className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                >
+                  <Play size={16} className="sm:w-5 sm:h-5" />
+                  <span>Start</span>
+                </button>
+                <button
+                  onClick={pauseStopwatch}
+                  disabled={!isStopwatchRunning}
+                  className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                >
+                  <Pause size={16} className="sm:w-5 sm:h-5" />
+                  <span>Pause</span>
+                </button>
+                <button
+                  onClick={stopStopwatch}
+                  disabled={!isStopwatchRunning}
+                  className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                >
+                  <Square size={16} className="sm:w-5 sm:h-5" />
+                  <span>Stop</span>
+                </button>
+                <button
+                  onClick={resetStopwatch}
+                  className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 md:px-6 py-2 sm:py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm sm:text-base"
+                >
+                  <RotateCcw size={16} className="sm:w-5 sm:h-5" />
+                  <span>Reset</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Tag Statistics */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+          {userTags.map(tag => (
+            <div
+              key={tag}
+              className="p-3 sm:p-4 rounded-lg border"
+              style={{ backgroundColor: getTagBackground(tag) }}
+            >
+              <div className="text-sm font-medium truncate" style={{ color: getTagColor(tag) }}>
+                {tag}
+              </div>
+              <div className="text-lg sm:text-xl md:text-2xl font-bold" style={{ color: getTagColor(tag) }}>
+                {formatTime(tagTotals[tag] || 0)}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Recent Tasks */}
+        <div className="space-y-3 sm:space-y-4">
+          <h2 className="text-lg sm:text-xl font-semibold">Recent Tasks</h2>
+          <div className="space-y-2 max-h-60 sm:max-h-80 overflow-y-auto">
+            {tasks.slice(-10).reverse().map(task => {
+              return (
+                <div key={task.id} className="flex items-center justify-between p-3 bg-card rounded-lg border gap-3">
+                  <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                    <div
+                      className="w-3 h-3 rounded-full shrink-0"
+                      style={{ backgroundColor: getTagColor(task.tag) }}
+                    />
+                    {editingTask === task.id ? (
+                      <input
+                        type="text"
+                        defaultValue={task.task}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            editTask(task.id, e.target.value)
+                          }
+                          if (e.key === 'Escape') {
+                            setEditingTask(null)
+                          }
+                        }}
+                        onBlur={(e) => editTask(task.id, e.target.value)}
+                        className="flex-1 px-2 py-1 border rounded text-sm"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="flex-1 truncate text-sm sm:text-base">{task.task}</span>
+                    )}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 text-xs sm:text-sm text-muted-foreground shrink-0">
+                      <span className="font-mono">{formatTime(task.duration)}</span>
+                      <span className="hidden sm:inline">{task.date}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-1 shrink-0">
+                    <button
+                      onClick={() => setEditingTask(task.id)}
+                      className="p-1 hover:bg-muted rounded"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      onClick={() => deleteTask(task)}
+                      className="p-1 hover:bg-muted rounded text-red-500"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>
