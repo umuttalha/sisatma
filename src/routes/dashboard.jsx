@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
 import React, { useState, useEffect } from 'react'
+import { Edit2, X } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard')({
   component: DashboardPage,
@@ -18,6 +19,7 @@ function DashboardPage() {
     const savedTags = localStorage.getItem('userTags')
     return savedTags ? JSON.parse(savedTags) : ['Other']
   })
+  const [editingTask, setEditingTask] = useState(null)
 
   useEffect(() => {
     const savedTasks = localStorage.getItem('timeTasks')
@@ -26,9 +28,30 @@ function DashboardPage() {
     }
   }, [])
 
+  // Save tasks when they change
+  useEffect(() => {
+    localStorage.setItem('timeTasks', JSON.stringify(tasks))
+  }, [tasks])
+
   const getTagColor = (tagName) => {
     const colorIndex = userTags.indexOf(tagName) % TAG_COLORS.length
     return TAG_COLORS[colorIndex]
+  }
+
+  const getTagBackground = (tagName) => {
+    const color = getTagColor(tagName)
+    // Convert hex to rgba with low opacity for background
+    const r = parseInt(color.slice(1, 3), 16)
+    const g = parseInt(color.slice(3, 5), 16)
+    const b = parseInt(color.slice(5, 7), 16)
+    return `rgba(${r}, ${g}, ${b}, 0.1)`
+  }
+
+  const formatTime = (totalSeconds) => {
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
 
 const formatTimeMinutes = (totalSeconds) => {
@@ -42,6 +65,31 @@ const formatTimeMinutes = (totalSeconds) => {
 
   const formatMinutesOnly = (totalSeconds) => {
     return Math.floor(totalSeconds / 60)
+  }
+
+  // Get total time by tag (for the tag statistics section)
+  const getTotalTimeByTag = () => {
+    const tagTotals = {}
+    tasks.forEach(task => {
+      if (!tagTotals[task.tag]) {
+        tagTotals[task.tag] = 0
+      }
+      tagTotals[task.tag] += task.duration
+    })
+    return tagTotals
+  }
+
+  // Delete task function
+  const deleteTask = (taskToDelete) => {
+    setTasks(prev => prev.filter(task => task.id !== taskToDelete.id))
+  }
+
+  // Edit task function
+  const editTask = (id, newTask) => {
+    setTasks(prev => prev.map(task => 
+      task.id === id ? { ...task, task: newTask } : task
+    ))
+    setEditingTask(null)
   }
 
   // Get daily data for last 7 days
@@ -100,6 +148,7 @@ const formatTimeMinutes = (totalSeconds) => {
 
   const dailyData = getDailyData()
   const tagDistribution = getTagDistribution()
+  const tagTotals = getTotalTimeByTag()
   
   const totalSeconds = tasks.reduce((sum, task) => sum + task.duration, 0)
   const totalTasks = tasks.length
@@ -142,7 +191,7 @@ const formatTimeMinutes = (totalSeconds) => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-card p-6 rounded-lg border">
-          <div className="text-2xl font-bold text-blue-600">{formatTimeMinutes(totalSeconds)}</div>
+          <div className="text-2xl font-bold text-blue-600">{formatTime(totalSeconds)}</div>
           <div className="text-sm text-muted-foreground">Total Time Tracked</div>
         </div>
         <div className="bg-card p-6 rounded-lg border">
@@ -152,6 +201,30 @@ const formatTimeMinutes = (totalSeconds) => {
         <div className="bg-card p-6 rounded-lg border">
           <div className="text-2xl font-bold text-purple-600">{formatTimeMinutes(averageSessionTime)}</div>
           <div className="text-sm text-muted-foreground">Average Session</div>
+        </div>
+      </div>
+
+      {/* Tag Statistics - Enhanced with total hours display */}
+      <div className="bg-card p-6 rounded-lg border">
+        <h2 className="text-xl font-semibold mb-4">Time by Category</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {userTags.map(tag => (
+            <div
+              key={tag}
+              className="p-4 rounded-lg border"
+              style={{ backgroundColor: getTagBackground(tag) }}
+            >
+              <div className="text-sm font-medium truncate" style={{ color: getTagColor(tag) }}>
+                {tag}
+              </div>
+              <div className="text-xl font-bold" style={{ color: getTagColor(tag) }}>
+                {formatTime(tagTotals[tag] || 0)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {formatMinutesOnly(tagTotals[tag] || 0)} minutes
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -225,7 +298,73 @@ const formatTimeMinutes = (totalSeconds) => {
         </div>
       </div>
 
-      {/* Recent Activity Summary */}
+      {/* Recent Tasks Section - Transferred from home page */}
+      <div className="bg-card p-6 rounded-lg border">
+        <h2 className="text-xl font-semibold mb-4">Recent Tasks</h2>
+        <div className="space-y-2 max-h-80 overflow-y-auto">
+          {tasks.slice(-15).reverse().map(task => {
+            return (
+              <div key={task.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border gap-3">
+                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: getTagColor(task.tag) }}
+                  />
+                  {editingTask === task.id ? (
+                    <input
+                      type="text"
+                      defaultValue={task.task}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          editTask(task.id, e.target.value)
+                        }
+                        if (e.key === 'Escape') {
+                          setEditingTask(null)
+                        }
+                      }}
+                      onBlur={(e) => editTask(task.id, e.target.value)}
+                      className="flex-1 px-2 py-1 border rounded text-sm"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="flex-1 truncate">{task.task}</span>
+                  )}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 text-sm text-muted-foreground shrink-0">
+                    <span className="font-mono">{formatTime(task.duration)}</span>
+                    <span className="text-xs">{task.date}</span>
+                    <span className="text-xs capitalize px-2 py-1 bg-background rounded" style={{ color: getTagColor(task.tag) }}>
+                      {task.tag}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-1 shrink-0">
+                  <button
+                    onClick={() => setEditingTask(task.id)}
+                    className="p-1 hover:bg-muted rounded"
+                    title="Edit task"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <button
+                    onClick={() => deleteTask(task)}
+                    className="p-1 hover:bg-muted rounded text-red-500"
+                    title="Delete task"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+          {tasks.length === 0 && (
+            <div className="text-center text-muted-foreground py-8">
+              No tasks recorded yet. Start using the timer to see your activity here!
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Today's Activity Summary */}
       <div className="bg-card p-6 rounded-lg border">
         <h2 className="text-xl font-semibold mb-4">Today's Activity</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

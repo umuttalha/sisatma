@@ -1,7 +1,7 @@
-// index.jsx - Complete Timer page with responsive design
+// index.jsx - Simplified Timer page focused on timing functionality
 import { createFileRoute } from '@tanstack/react-router'
 import React, { useState, useEffect } from 'react'
-import { Play, Pause, Square, RotateCcw, Clock, Timer as TimerIcon, Plus, X, Edit2, Check } from 'lucide-react'
+import { Play, Pause, Square, RotateCcw, Clock, Timer as TimerIcon, Plus, X } from 'lucide-react'
 
 export const Route = createFileRoute('/')({
   component: TimerPage,
@@ -59,9 +59,11 @@ function TimerPage() {
   const [stopwatchPausedTime, setStopwatchPausedTime] = useState(() => {
     return parseInt(localStorage.getItem('stopwatchPausedTime')) || 0
   })
-  const [editingTask, setEditingTask] = useState(null)
   const [newTagName, setNewTagName] = useState('')
   const [showTagManager, setShowTagManager] = useState(false)
+  const [isEditingTime, setIsEditingTime] = useState(false)
+  const [editMinutes, setEditMinutes] = useState('')
+  const [editSeconds, setEditSeconds] = useState('')
 
   // Save all state to localStorage
   useEffect(() => {
@@ -295,33 +297,46 @@ function TimerPage() {
     setStopwatchPausedTime(0)
   }
 
-  const deleteTask = (taskToDelete) => {
-    setTasks(prev => prev.filter(task => task.id !== taskToDelete.id))
+  const handleTimeClick = () => {
+    if (activeTab === 'timer' && !isTimerRunning) {
+      setIsEditingTime(true)
+      setEditMinutes(timerMinutes.toString())
+      setEditSeconds(timerSeconds.toString())
+    }
   }
 
-  const editTask = (id, newTask) => {
-    setTasks(prev => prev.map(task => 
-      task.id === id ? { ...task, task: newTask } : task
-    ))
-    setEditingTask(null)
+  const handleTimeSubmit = () => {
+    const minutes = parseInt(editMinutes) || 0
+    const seconds = parseInt(editSeconds) || 0
+    
+    if (seconds >= 60) {
+      setTimerMinutes(minutes + Math.floor(seconds / 60))
+      setTimerSeconds(seconds % 60)
+    } else {
+      setTimerMinutes(minutes)
+      setTimerSeconds(seconds)
+    }
+    
+    setIsEditingTime(false)
   }
 
-  const getTotalTimeByTag = () => {
-    const tagTotals = {}
-    tasks.forEach(task => {
-      if (!tagTotals[task.tag]) {
-        tagTotals[task.tag] = 0
-      }
-      tagTotals[task.tag] += task.duration
-    })
-    return tagTotals
+  const handleTimeCancel = () => {
+    setIsEditingTime(false)
+    setEditMinutes('')
+    setEditSeconds('')
   }
 
-  const tagTotals = getTotalTimeByTag()
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleTimeSubmit()
+    } else if (e.key === 'Escape') {
+      handleTimeCancel()
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background px-4 py-4 sm:py-6 md:py-8">
-      <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8">
+      <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
         {/* Tab Navigation */}
         <div className="flex justify-center">
           <div className="flex space-x-1 bg-muted p-1 rounded-lg">
@@ -352,50 +367,65 @@ function TimerPage() {
 
         {/* Timer/Stopwatch Display */}
         <div className="text-center space-y-4 sm:space-y-6">
-          {/* Timer Input Controls */}
-          {activeTab === 'timer' && (
-            <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
-              <div className="flex items-center justify-center space-x-2">
-                <label className="text-sm font-medium whitespace-nowrap">Minutes:</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="999"
-                  value={timerMinutes}
-                  onChange={(e) => {
-                    if (!isTimerRunning) {
-                      setTimerMinutes(parseInt(e.target.value) || 0)
-                    }
-                  }}
-                  disabled={isTimerRunning}
-                  className="w-16 sm:w-20 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-center"
-                />
-              </div>
-              <div className="flex items-center justify-center space-x-2">
-                <label className="text-sm font-medium whitespace-nowrap">Seconds:</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="59"
-                  value={timerSeconds}
-                  onChange={(e) => {
-                    if (!isTimerRunning) {
-                      setTimerSeconds(parseInt(e.target.value) || 0)
-                    }
-                  }}
-                  disabled={isTimerRunning}
-                  className="w-16 sm:w-20 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-center"
-                />
-              </div>
-            </div>
-          )}
-
           {/* Main Timer Display */}
-          <div className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-mono font-bold text-primary break-all">
-            {activeTab === 'timer'
-              ? `${timerMinutes.toString().padStart(2, '0')}:${timerSeconds.toString().padStart(2, '0')}`
-              : formatTime(stopwatchTime)
-            }
+          <div className="relative">
+            {activeTab === 'timer' && isEditingTime ? (
+              <div className="flex justify-center items-center space-x-2 sm:space-x-4">
+                <div className="flex flex-col items-center space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Minutes</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="999"
+                    value={editMinutes}
+                    onChange={(e) => setEditMinutes(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="w-20 sm:w-24 px-3 py-2 text-2xl sm:text-3xl font-mono text-center border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    autoFocus
+                  />
+                </div>
+                <span className="text-2xl sm:text-3xl font-mono font-bold">:</span>
+                <div className="flex flex-col items-center space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Seconds</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={editSeconds}
+                    onChange={(e) => setEditSeconds(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="w-20 sm:w-24 px-3 py-2 text-2xl sm:text-3xl font-mono text-center border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div className="flex flex-col space-y-2 ml-4">
+                  <button
+                    onClick={handleTimeSubmit}
+                    className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    onClick={handleTimeCancel}
+                    className="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ) : (
+             <div 
+                className={`text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-mono font-bold text-primary break-all ${
+                  activeTab === 'timer' && !isTimerRunning ? 'cursor-pointer' : ''
+                }`}
+                onClick={handleTimeClick}
+                title={activeTab === 'timer' && !isTimerRunning ? 'Click to edit time' : ''}
+              >
+                {activeTab === 'timer'
+                  ? `${timerMinutes.toString().padStart(2, '0')}:${timerSeconds.toString().padStart(2, '0')}`
+                  : formatTime(stopwatchTime)
+                }
+              </div>
+            )}
           </div>
 
           {/* Task Input Section */}
@@ -572,80 +602,6 @@ function TimerPage() {
                 </button>
               </>
             )}
-          </div>
-        </div>
-
-        {/* Tag Statistics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-          {userTags.map(tag => (
-            <div
-              key={tag}
-              className="p-3 sm:p-4 rounded-lg border"
-              style={{ backgroundColor: getTagBackground(tag) }}
-            >
-              <div className="text-sm font-medium truncate" style={{ color: getTagColor(tag) }}>
-                {tag}
-              </div>
-              <div className="text-lg sm:text-xl md:text-2xl font-bold" style={{ color: getTagColor(tag) }}>
-                {formatTime(tagTotals[tag] || 0)}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Recent Tasks */}
-        <div className="space-y-3 sm:space-y-4">
-          <h2 className="text-lg sm:text-xl font-semibold">Recent Tasks</h2>
-          <div className="space-y-2 max-h-60 sm:max-h-80 overflow-y-auto">
-            {tasks.slice(-10).reverse().map(task => {
-              return (
-                <div key={task.id} className="flex items-center justify-between p-3 bg-card rounded-lg border gap-3">
-                  <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-                    <div
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ backgroundColor: getTagColor(task.tag) }}
-                    />
-                    {editingTask === task.id ? (
-                      <input
-                        type="text"
-                        defaultValue={task.task}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            editTask(task.id, e.target.value)
-                          }
-                          if (e.key === 'Escape') {
-                            setEditingTask(null)
-                          }
-                        }}
-                        onBlur={(e) => editTask(task.id, e.target.value)}
-                        className="flex-1 px-2 py-1 border rounded text-sm"
-                        autoFocus
-                      />
-                    ) : (
-                      <span className="flex-1 truncate text-sm sm:text-base">{task.task}</span>
-                    )}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 text-xs sm:text-sm text-muted-foreground shrink-0">
-                      <span className="font-mono">{formatTime(task.duration)}</span>
-                      <span className="hidden sm:inline">{task.date}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-1 shrink-0">
-                    <button
-                      onClick={() => setEditingTask(task.id)}
-                      className="p-1 hover:bg-muted rounded"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    <button
-                      onClick={() => deleteTask(task)}
-                      className="p-1 hover:bg-muted rounded text-red-500"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
           </div>
         </div>
       </div>
