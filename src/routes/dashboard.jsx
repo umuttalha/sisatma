@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
 import React, { useState, useEffect } from 'react'
-import { Edit2, X } from 'lucide-react'
+import { Edit2, X, TrendingUp } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard')({
   component: DashboardPage,
@@ -178,6 +178,70 @@ const formatTimeMinutes = (totalSeconds) => {
           <p style={{ color: data.payload.color }}>
             {data.name}: {data.value} minutes
           </p>
+        </div>
+      )
+    }
+    return null
+  }
+
+  // Generate hourly activity data for the new chart
+  const generateHourlyData = () => {
+    // Create 24 hours array
+    const hours = Array.from({ length: 24 }, (_, i) => {
+      const hour = i.toString().padStart(2, '0')
+      return {
+        hour: `${hour}:00`,
+        hourNumber: i,
+        ...userTags.reduce((acc, tag) => ({ ...acc, [tag]: 0 }), {})
+      }
+    })
+
+    // Get last 7 days date range
+    const last7Days = []
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      last7Days.push(date.toISOString().split('T')[0])
+    }
+
+    // Filter tasks from last 7 days
+    const recentTasks = tasks.filter(task => last7Days.includes(task.date))
+
+    // Process each task and add to appropriate hour
+    recentTasks.forEach(task => {
+      if (task.timestamp) {
+        const taskDate = new Date(task.timestamp)
+        const hour = taskDate.getHours()
+        const durationMinutes = Math.floor(task.duration / 60) // Convert seconds to minutes
+        
+        if (hours[hour] && task.tag) {
+          hours[hour][task.tag] = (hours[hour][task.tag] || 0) + durationMinutes
+        }
+      }
+    })
+
+    return hours
+  }
+
+  // Custom hourly tooltip
+  const CustomHourlyTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const total = payload.reduce((sum, entry) => sum + entry.value, 0)
+      return (
+        <div className="bg-background border rounded-lg p-3 shadow-lg">
+          <p className="font-medium">{label}</p>
+          {payload.map((entry, index) => (
+            entry.value > 0 && (
+              <p key={index} style={{ color: entry.color }}>
+                {entry.dataKey}: {entry.value} min
+              </p>
+            )
+          ))}
+          {total > 0 && (
+            <p className="font-medium border-t pt-1 mt-1">
+              Total: {total} min
+            </p>
+          )}
         </div>
       )
     }
