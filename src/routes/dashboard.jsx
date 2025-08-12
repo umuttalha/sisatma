@@ -31,10 +31,6 @@ function TimelineSlider({ tasks, userTags }) {
     return Math.round(minutes / 15) * 15
   }
 
-  const goToToday = () => {
-  setSelectedDate(new Date().toISOString().split('T')[0])
-}
-
   const handleSliderClick = useCallback((e) => {
     if (!sliderRef.current) return
 
@@ -56,6 +52,10 @@ function TimelineSlider({ tasks, userTags }) {
   const getTaskTimeInMinutes = (timestamp) => {
     const date = new Date(timestamp)
     return date.getHours() * 60 + date.getMinutes()
+  }
+
+  const goToToday = () => {
+    setSelectedDate(new Date().toISOString().split('T')[0])
   }
 
   // Filter tasks for selected date
@@ -241,71 +241,70 @@ function TimelineSlider({ tasks, userTags }) {
         {/* Timeline Slider */}
         <div className="lg:col-span-2 flex justify-center">
           <div className="flex flex-col items-center">
-            <div
-              ref={sliderRef}
-              className="relative w-32 h-[600px] bg-slate-200 dark:bg-slate-700 rounded-full cursor-pointer shadow-inner"
-              onClick={handleSliderClick}
-            >
-              {/* Hour markers */}
-              {Array.from({ length: 25 }, (_, i) => (
-                <div key={i} className="absolute left-0 w-full flex items-center" style={{ top: `${(i / 24) * 100}%` }}>
-                  <div className="w-8 h-0.5 bg-slate-400 dark:bg-slate-500 ml-2" />
-                  <span className="text-sm text-slate-600 dark:text-slate-400 ml-3 min-w-[3rem] font-medium">
-                    {i.toString().padStart(2, "0")}:00
-                  </span>
-                </div>
-              ))}
-
-              {/* 15-minute markers */}
-              {Array.from({ length: 96 }, (_, i) => {
-                const minutes = i * 15
-                const isHour = minutes % 60 === 0
-                if (isHour) return null
-
-                return (
-                  <div key={`quarter-${i}`} className="absolute left-0" style={{ top: `${(minutes / 1440) * 100}%` }}>
-                    <div className="w-4 h-px bg-slate-300 dark:bg-slate-600 ml-2" />
-                  </div>
-                )
-              })}
-
-              {/* Activity bars */}
-              {activities.map((activity, index) => (
-                <div
-                  key={activity.id}
-                  className="absolute left-3 right-3 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer opacity-90 hover:opacity-100"
-                  style={{
-                    top: `${(activity.time / 1440) * 100}%`,
-                    height: `${Math.max((activity.duration / 1440) * 100, 1)}%`,
-                    minHeight: "8px",
-                    backgroundColor: getTagColor(activity.tag),
-                    borderColor: getTagColor(activity.tag),
-                  }}
-                  title={`${activity.title} (${formatTime(activity.time)} - ${formatTime(activity.time + activity.duration)}) - ${formatDuration(activity.originalDuration)}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedTime(activity.time)
-                  }}
-                >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    {activity.duration >= 30 && (
-                      <span className="text-xs text-white font-medium px-1 bg-black bg-opacity-30 rounded">
-                        {Math.floor(activity.originalDuration / 60)}m
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {/* Current time indicator */}
               <div
-                className="absolute left-0 right-0 h-2 bg-red-500 rounded-full shadow-lg z-10"
-                style={{ top: `${(selectedTime / 1440) * 100}%` }}
-              >
-                <div className="absolute -right-4 -top-4 w-8 h-8 bg-red-500 rounded-full border-4 border-white dark:border-slate-800 shadow-lg" />
-              </div>
-            </div>
+  ref={sliderRef}
+  className="relative w-32 h-[600px] bg-transparent rounded-full cursor-pointer"
+  onClick={handleSliderClick}
+>
+  {/* Hour markers */}
+  {Array.from({ length: 25 }, (_, i) => (
+    <div key={i} className="absolute left-0 w-full flex items-center" style={{ top: `${(i / 24) * 100}%` }}>
+      <div className="w-8 h-0.5 bg-slate-400 dark:bg-slate-500 ml-2" />
+      <span className="text-sm text-slate-600 dark:text-slate-400 ml-3 min-w-[3rem] font-medium">
+        {i.toString().padStart(2, "0")}:00
+      </span>
+    </div>
+  ))}
 
+  {/* 15-minute markers */}
+  {Array.from({ length: 96 }, (_, i) => {
+    const minutes = i * 15
+    const isHour = minutes % 60 === 0
+    if (isHour) return null
+
+    return (
+      <div key={`quarter-${i}`} className="absolute left-0" style={{ top: `${(minutes / 1440) * 100}%` }}>
+        <div className="w-4 h-px bg-slate-300 dark:bg-slate-600 ml-2" />
+      </div>
+    )
+  })}
+
+  {/* Activity bars */}
+  {activities.map((activity, index) => (
+    <div
+      key={activity.id}
+      className="absolute left-3 right-3 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer opacity-90 hover:opacity-100"
+      style={{
+        top: `${(activity.time / 1440) * 100}%`,
+        height: `${Math.max((activity.duration / 1440) * 100, 1)}%`,
+        minHeight: "8px",
+        backgroundColor: getTagColor(activity.tag),
+        borderColor: getTagColor(activity.tag),
+      }}
+      title={`${activity.title} (${formatTime(activity.time)} - ${formatTime(activity.time + activity.duration)}) - ${formatDuration(activity.originalDuration)}`}
+      onClick={(e) => {
+        e.stopPropagation()
+        setSelectedTime(activity.time)
+      }}
+    >
+      <div className="absolute inset-0 flex items-center justify-center">
+        {activity.duration >= 30 && (
+          <span className="text-xs text-white font-medium px-1 bg-black bg-opacity-30 rounded">
+            {Math.floor(activity.originalDuration / 60)}m
+          </span>
+        )}
+      </div>
+    </div>
+  ))}
+
+  {/* Current time indicator */}
+  <div
+    className="absolute left-0 right-0 h-1 bg-red-500 rounded-full shadow-lg z-10 pointer-events-none"
+    style={{ top: `calc(${(selectedTime / 1440) * 100}% - 2px)` }}
+  >
+    <div className="absolute -right-2 -top-2 w-5 h-5 bg-red-500 rounded-full border-2 border-white dark:border-slate-800 shadow-lg" />
+  </div>
+</div>
             <div className="mt-6 text-center">
               <div className="text-2xl font-bold text-primary">{formatTime(selectedTime)}</div>
               <div className="text-sm text-muted-foreground">Selected Time</div>
