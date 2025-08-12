@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
-import React, { useState, useEffect } from 'react'
-import { Edit2, X, TrendingUp } from 'lucide-react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { Edit2, X, TrendingUp, Calendar, Clock, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard')({
   component: DashboardPage,
@@ -12,6 +12,386 @@ const TAG_COLORS = [
   '#ef4444', '#06b6d4', '#ec4899', '#6b7280',
   '#f97316', '#84cc16', '#06b6d4', '#8b5cf6'
 ]
+
+// Timeline Component
+function TimelineSlider({ tasks, userTags }) {
+  const [selectedTime, setSelectedTime] = useState(480) // 8:00 AM default
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedTags, setSelectedTags] = useState([])
+  
+  const sliderRef = useRef(null)
+
+  const formatTime = (minutes) => {
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`
+  }
+
+  const snapToFifteenMinutes = (minutes) => {
+    return Math.round(minutes / 15) * 15
+  }
+
+  const goToToday = () => {
+  setSelectedDate(new Date().toISOString().split('T')[0])
+}
+
+  const handleSliderClick = useCallback((e) => {
+    if (!sliderRef.current) return
+
+    const rect = sliderRef.current.getBoundingClientRect()
+    const y = e.clientY - rect.top
+    const percentage = Math.max(0, Math.min(1, y / rect.height))
+    const timeInMinutes = percentage * 1440 // 24 hours * 60 minutes
+
+    const snappedTime = snapToFifteenMinutes(timeInMinutes)
+    setSelectedTime(snappedTime)
+  }, [])
+
+  const getTagColor = (tagName) => {
+    const colorIndex = userTags.indexOf(tagName) % TAG_COLORS.length
+    return TAG_COLORS[colorIndex]
+  }
+
+  // Convert task timestamp to minutes from midnight
+  const getTaskTimeInMinutes = (timestamp) => {
+    const date = new Date(timestamp)
+    return date.getHours() * 60 + date.getMinutes()
+  }
+
+  // Filter tasks for selected date
+  const getActivitiesForDate = () => {
+    const filteredTasks = tasks.filter(task => {
+      const taskDate = task.date || new Date(task.timestamp).toISOString().split('T')[0]
+      const matchesDate = taskDate === selectedDate
+      const matchesTag = selectedTags.length === 0 || selectedTags.includes(task.tag)
+      return matchesDate && matchesTag
+    })
+
+    return filteredTasks.map(task => ({
+      id: task.id,
+      time: task.timestamp ? getTaskTimeInMinutes(task.timestamp) : 480, // Default to 8 AM if no timestamp
+      title: task.task,
+      duration: Math.max(task.duration / 60, 5), // Convert seconds to minutes, minimum 5 minutes for visibility
+      tag: task.tag,
+      originalDuration: task.duration
+    }))
+  }
+
+  const activities = getActivitiesForDate()
+
+  // Get activity at selected time
+  const getActivityAtTime = () => {
+    return activities.find(activity => 
+      selectedTime >= activity.time && 
+      selectedTime < activity.time + activity.duration
+    )
+  }
+
+  const currentActivity = getActivityAtTime()
+
+  // Format duration for display
+  const formatDuration = (seconds) => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${secs}s`
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`
+    } else {
+      return `${secs}s`
+    }
+  }
+
+  // Get total time for the day
+  const getTotalTimeForDay = () => {
+    return activities.reduce((total, activity) => total + activity.originalDuration, 0)
+  }
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString)
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    if (dateString === today.toISOString().split('T')[0]) {
+      return 'Today'
+    } else if (dateString === yesterday.toISOString().split('T')[0]) {
+      return 'Yesterday'
+    } else if (dateString === tomorrow.toISOString().split('T')[0]) {
+      return 'Tomorrow'
+    } else {
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        month: 'short', 
+        day: 'numeric',
+        year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+      })
+    }
+  }
+
+  const navigateDay = (direction) => {
+    const currentDate = new Date(selectedDate)
+    currentDate.setDate(currentDate.getDate() + direction)
+    setSelectedDate(currentDate.toISOString().split('T')[0])
+  }
+
+  const toggleTagFilter = (tag) => {
+    setSelectedTags(prev => 
+      prev.includes(tag) 
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    )
+  }
+
+  return (
+    <div className="w-full space-y-6">
+      {/* Controls */}
+      <div className="space-y-4">
+        {/* Date Navigation */}
+        <div className="flex items-center justify-center space-x-4 bg-card p-4 rounded-lg border">
+          <button
+            onClick={() => navigateDay(-1)}
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
+            title="Previous day"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          
+          <div className="flex items-center space-x-4">
+            <div className="text-center">
+              <div className="text-lg font-semibold">{formatDate(selectedDate)}</div>
+              <div className="text-sm text-muted-foreground">
+                {new Date(selectedDate).toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </div>
+            </div>
+            
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+            />
+          </div>
+          
+          <button
+            onClick={() => navigateDay(1)}
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
+            title="Next day"
+          >
+            <ChevronRight size={20} />
+          </button>
+          
+          {selectedDate !== new Date().toISOString().split('T')[0] && (
+            <button
+              onClick={goToToday}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+            >
+              Today
+            </button>
+          )}
+        </div>
+
+        {/* Activity Summary and Filters */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between bg-card p-4 rounded-lg border">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex items-center space-x-2">
+              <Clock size={20} className="text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                Total: {formatDuration(getTotalTimeForDay())} | Activities: {activities.length}
+              </span>
+            </div>
+          </div>
+
+          {/* Tag Filters */}
+          <div className="flex items-center space-x-2">
+            <Filter size={16} className="text-muted-foreground" />
+            <div className="flex flex-wrap gap-2">
+              {userTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => toggleTagFilter(tag)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
+                    selectedTags.includes(tag) || selectedTags.length === 0
+                      ? 'text-white shadow-md'
+                      : 'text-muted-foreground bg-muted hover:bg-muted/80'
+                  }`}
+                  style={{
+                    backgroundColor: selectedTags.includes(tag) || selectedTags.length === 0 
+                      ? getTagColor(tag) 
+                      : undefined
+                  }}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Timeline Slider */}
+        <div className="lg:col-span-2 flex justify-center">
+          <div className="flex flex-col items-center">
+            <div
+              ref={sliderRef}
+              className="relative w-32 h-[600px] bg-slate-200 dark:bg-slate-700 rounded-full cursor-pointer shadow-inner"
+              onClick={handleSliderClick}
+            >
+              {/* Hour markers */}
+              {Array.from({ length: 25 }, (_, i) => (
+                <div key={i} className="absolute left-0 w-full flex items-center" style={{ top: `${(i / 24) * 100}%` }}>
+                  <div className="w-8 h-0.5 bg-slate-400 dark:bg-slate-500 ml-2" />
+                  <span className="text-sm text-slate-600 dark:text-slate-400 ml-3 min-w-[3rem] font-medium">
+                    {i.toString().padStart(2, "0")}:00
+                  </span>
+                </div>
+              ))}
+
+              {/* 15-minute markers */}
+              {Array.from({ length: 96 }, (_, i) => {
+                const minutes = i * 15
+                const isHour = minutes % 60 === 0
+                if (isHour) return null
+
+                return (
+                  <div key={`quarter-${i}`} className="absolute left-0" style={{ top: `${(minutes / 1440) * 100}%` }}>
+                    <div className="w-4 h-px bg-slate-300 dark:bg-slate-600 ml-2" />
+                  </div>
+                )
+              })}
+
+              {/* Activity bars */}
+              {activities.map((activity, index) => (
+                <div
+                  key={activity.id}
+                  className="absolute left-3 right-3 rounded-lg border-l-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer opacity-90 hover:opacity-100"
+                  style={{
+                    top: `${(activity.time / 1440) * 100}%`,
+                    height: `${Math.max((activity.duration / 1440) * 100, 1)}%`,
+                    minHeight: "8px",
+                    backgroundColor: getTagColor(activity.tag),
+                    borderColor: getTagColor(activity.tag),
+                  }}
+                  title={`${activity.title} (${formatTime(activity.time)} - ${formatTime(activity.time + activity.duration)}) - ${formatDuration(activity.originalDuration)}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSelectedTime(activity.time)
+                  }}
+                >
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    {activity.duration >= 30 && (
+                      <span className="text-xs text-white font-medium px-1 bg-black bg-opacity-30 rounded">
+                        {Math.floor(activity.originalDuration / 60)}m
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Current time indicator */}
+              <div
+                className="absolute left-0 right-0 h-2 bg-red-500 rounded-full shadow-lg z-10"
+                style={{ top: `${(selectedTime / 1440) * 100}%` }}
+              >
+                <div className="absolute -right-4 -top-4 w-8 h-8 bg-red-500 rounded-full border-4 border-white dark:border-slate-800 shadow-lg" />
+              </div>
+            </div>
+
+            <div className="mt-6 text-center">
+              <div className="text-2xl font-bold text-primary">{formatTime(selectedTime)}</div>
+              <div className="text-sm text-muted-foreground">Selected Time</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Activity Details Panel */}
+        <div className="space-y-6">
+          {/* Current Activity */}
+          <div className="bg-card p-6 rounded-lg border">
+            <h3 className="text-lg font-semibold mb-4">Activity at {formatTime(selectedTime)}</h3>
+            {currentActivity ? (
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: getTagColor(currentActivity.tag) }}
+                  />
+                  <span className="font-medium">{currentActivity.title}</span>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <div>Category: <span className="font-medium" style={{ color: getTagColor(currentActivity.tag) }}>{currentActivity.tag}</span></div>
+                  <div>Duration: <span className="font-medium">{formatDuration(currentActivity.originalDuration)}</span></div>
+                  <div>Time: <span className="font-medium">{formatTime(currentActivity.time)} - {formatTime(currentActivity.time + currentActivity.duration)}</span></div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-4">
+                <Clock size={32} className="mx-auto mb-2 opacity-50" />
+                <p>No activity at this time</p>
+              </div>
+            )}
+          </div>
+
+          {/* Day Summary */}
+          <div className="bg-card p-6 rounded-lg border">
+            <h3 className="text-lg font-semibold mb-4">Day Summary</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Total Time:</span>
+                <span className="font-bold text-primary">{formatDuration(getTotalTimeForDay())}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Activities:</span>
+                <span className="font-medium">{activities.length}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Categories:</span>
+                <span className="font-medium">{new Set(activities.map(a => a.tag)).size}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Category Breakdown */}
+          <div className="bg-card p-6 rounded-lg border">
+            <h3 className="text-lg font-semibold mb-4">Category Breakdown</h3>
+            <div className="space-y-3">
+              {userTags.map(tag => {
+                const tagActivities = activities.filter(a => a.tag === tag)
+                const totalTime = tagActivities.reduce((sum, a) => sum + a.originalDuration, 0)
+                
+                if (totalTime === 0) return null
+                
+                return (
+                  <div key={tag} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: getTagColor(tag) }}
+                      />
+                      <span className="text-sm">{tag}</span>
+                    </div>
+                    <div className="text-sm font-medium">
+                      {formatDuration(totalTime)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function DashboardPage() {
   const [tasks, setTasks] = useState([])
@@ -184,70 +564,6 @@ const formatTimeMinutes = (totalSeconds) => {
     return null
   }
 
-  // Generate hourly activity data for the new chart
-  const generateHourlyData = () => {
-    // Create 24 hours array
-    const hours = Array.from({ length: 24 }, (_, i) => {
-      const hour = i.toString().padStart(2, '0')
-      return {
-        hour: `${hour}:00`,
-        hourNumber: i,
-        ...userTags.reduce((acc, tag) => ({ ...acc, [tag]: 0 }), {})
-      }
-    })
-
-    // Get last 7 days date range
-    const last7Days = []
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
-      last7Days.push(date.toISOString().split('T')[0])
-    }
-
-    // Filter tasks from last 7 days
-    const recentTasks = tasks.filter(task => last7Days.includes(task.date))
-
-    // Process each task and add to appropriate hour
-    recentTasks.forEach(task => {
-      if (task.timestamp) {
-        const taskDate = new Date(task.timestamp)
-        const hour = taskDate.getHours()
-        const durationMinutes = Math.floor(task.duration / 60) // Convert seconds to minutes
-        
-        if (hours[hour] && task.tag) {
-          hours[hour][task.tag] = (hours[hour][task.tag] || 0) + durationMinutes
-        }
-      }
-    })
-
-    return hours
-  }
-
-  // Custom hourly tooltip
-  const CustomHourlyTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const total = payload.reduce((sum, entry) => sum + entry.value, 0)
-      return (
-        <div className="bg-background border rounded-lg p-3 shadow-lg">
-          <p className="font-medium">{label}</p>
-          {payload.map((entry, index) => (
-            entry.value > 0 && (
-              <p key={index} style={{ color: entry.color }}>
-                {entry.dataKey}: {entry.value} min
-              </p>
-            )
-          ))}
-          {total > 0 && (
-            <p className="font-medium border-t pt-1 mt-1">
-              Total: {total} min
-            </p>
-          )}
-        </div>
-      )
-    }
-    return null
-  }
-
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -266,6 +582,15 @@ const formatTimeMinutes = (totalSeconds) => {
           <div className="text-2xl font-bold text-purple-600">{formatTimeMinutes(averageSessionTime)}</div>
           <div className="text-sm text-muted-foreground">Average Session</div>
         </div>
+      </div>
+
+      {/* Timeline Section */}
+      <div className="bg-card p-6 rounded-lg border">
+        <div className="text-center space-y-2 mb-6">
+          <h2 className="text-2xl font-bold">Daily Activity Timeline</h2>
+          <p className="text-muted-foreground">Visualize your daily activities and time allocation</p>
+        </div>
+        <TimelineSlider tasks={tasks} userTags={userTags} />
       </div>
 
       {/* Tag Statistics - Enhanced with total hours display */}
