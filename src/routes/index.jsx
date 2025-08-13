@@ -63,15 +63,26 @@ function TimerPage() {
   const [showTagManager, setShowTagManager] = useState(false)
   const [isEditingTime, setIsEditingTime] = useState(false)
   const [editMinutes, setEditMinutes] = useState('')
-  const [editSeconds, setEditSeconds] = useState('')
+const [editSeconds, setEditSeconds] = useState('')
   
-  // New state for 2-stage UI
-  const [isInTimingMode, setIsInTimingMode] = useState(() => {
-    return localStorage.getItem('isInTimingMode') === 'true'
-  })
-  
-  // New state for showing controls
-  const [showControls, setShowControls] = useState(false)
+// New state for 2-stage UI
+const [isInTimingMode, setIsInTimingMode] = useState(() => {
+  return localStorage.getItem('isInTimingMode') === 'true'
+})
+
+// New state for showing controls
+const [showControls, setShowControls] = useState(false)
+
+// New state for time adjustment feature
+const [timeAdjustment, setTimeAdjustment] = useState(5) // Default 5 minutes
+const [showTimeAdjuster, setShowTimeAdjuster] = useState(false)
+const [hasUsedRandomAdjust, setHasUsedRandomAdjust] = useState(() => {
+  return localStorage.getItem('hasUsedRandomAdjust') === 'true'
+})
+const [lastAdjustment, setLastAdjustment] = useState(() => {
+  const saved = localStorage.getItem('lastAdjustment')
+  return saved ? parseInt(saved) : null
+})
 
   // Save all state to localStorage
   useEffect(() => {
@@ -137,6 +148,18 @@ function TimerPage() {
   useEffect(() => {
     localStorage.setItem('isInTimingMode', isInTimingMode.toString())
   }, [isInTimingMode])
+
+  useEffect(() => {
+  localStorage.setItem('hasUsedRandomAdjust', hasUsedRandomAdjust.toString())
+}, [hasUsedRandomAdjust])
+
+useEffect(() => {
+  if (lastAdjustment !== null) {
+    localStorage.setItem('lastAdjustment', lastAdjustment.toString())
+  } else {
+    localStorage.removeItem('lastAdjustment')
+  }
+}, [lastAdjustment])
 
   // Timer countdown
   useEffect(() => {
@@ -249,36 +272,44 @@ function TimerPage() {
     setCurrentTask('')
   }
 
-  const startTimer = () => {
-    if (currentTask.trim()) {
-      // Store the original timer duration when starting
-      if (!isTimerRunning && timerStartTime === 0) {
-        setTimerStartTime(timerMinutes * 60 + timerSeconds)
-      }
-      setIsTimerRunning(true)
-      setIsInTimingMode(true)
+const startTimer = () => {
+  if (currentTask.trim()) {
+    // Store the original timer duration when starting
+    if (!isTimerRunning && timerStartTime === 0) {
+      setTimerStartTime(timerMinutes * 60 + timerSeconds)
     }
+    setIsTimerRunning(true)
+    setIsInTimingMode(true)
+    // DON'T reset hasUsedRandomAdjust here - let it persist for the session
   }
+}
 
   const pauseTimer = () => {
     setIsTimerRunning(false)
     // Don't save task when pausing, just pause
   }
 
-  const stopTimer = () => {
-    setIsTimerRunning(false)
-    if (currentTask.trim()) {
-      saveCompletedTask('timer')
-    }
-    // Reset timer to original values and clear start time
-    setIsTimerRunning(false)
-    setTimerMinutes(25)
-    setTimerSeconds(0)
-    setTimerStartTime(0)
-    setTimerPausedTime(0)
-    setIsInTimingMode(false)
-    setShowControls(false)
+
+const stopTimer = () => {
+  setIsTimerRunning(false)
+  if (currentTask.trim()) {
+    saveCompletedTask('timer')
   }
+  // Reset timer to original values and clear start time
+  setIsTimerRunning(false)
+  setTimerMinutes(25)
+  setTimerSeconds(0)
+  setTimerStartTime(0)
+  setTimerPausedTime(0)
+  setIsInTimingMode(false)
+  setShowControls(false)
+  // Reset random adjustment state ONLY when completely stopping
+  setHasUsedRandomAdjust(false)
+  setLastAdjustment(null)
+  // Clean up localStorage
+  localStorage.removeItem('hasUsedRandomAdjust')
+  localStorage.removeItem('lastAdjustment')
+}
 
   const startStopwatch = () => {
     if (currentTask.trim()) {
@@ -348,32 +379,61 @@ function TimerPage() {
     }
   }
 
-  const handleTimingModeClick = () => {
-    if (activeTab === 'timer') {
-      // If timer is at 00:00, clicking should finish the task
-      if (timerMinutes === 0 && timerSeconds === 0 && isTimerRunning) {
-        stopTimer()
-        return
-      }
-      
-      if (isTimerRunning) {
-        pauseTimer()
-        setShowControls(true)
-      } else {
-        startTimer()
-        setShowControls(false)
-      }
+const adjustTime = () => {
+  if (activeTab !== 'timer' || hasUsedRandomAdjust) return
+  
+  // Generate random adjustment between -timeAdjustment and +timeAdjustment
+  const randomAdjustment = Math.floor(Math.random() * (timeAdjustment * 2 + 1)) - timeAdjustment
+  const adjustmentInSeconds = randomAdjustment * 60
+  
+  // Calculate total current time in seconds
+  const currentTotalSeconds = timerMinutes * 60 + timerSeconds
+  
+  // Add adjustment
+  const newTotalSeconds = Math.max(0, currentTotalSeconds + adjustmentInSeconds)
+  
+  // Convert back to minutes and seconds
+  const newMinutes = Math.floor(newTotalSeconds / 60)
+  const newSeconds = newTotalSeconds % 60
+  
+  setTimerMinutes(newMinutes)
+  setTimerSeconds(newSeconds)
+  
+  // Update the start time to maintain correct duration tracking
+  setTimerStartTime(prev => Math.max(0, prev + adjustmentInSeconds))
+  
+  // Mark as used and store the adjustment
+  setHasUsedRandomAdjust(true)
+  setLastAdjustment(randomAdjustment)
+}
+
+const handleTimingModeClick = () => {
+  if (activeTab === 'timer') {
+    // If timer is at 00:00, clicking should finish the task
+    if (timerMinutes === 0 && timerSeconds === 0 && isTimerRunning) {
+      stopTimer()
+      return
+    }
+    
+    if (isTimerRunning) {
+      pauseTimer()
+      setShowControls(true)
+      setShowTimeAdjuster(true)
     } else {
-      if (isStopwatchRunning) {
-        pauseStopwatch()
-        setShowControls(true)
-      } else {
-        startStopwatch()
-        setShowControls(false)
-      }
+      startTimer()
+      setShowControls(false)
+      setShowTimeAdjuster(false)
+    }
+  } else {
+    if (isStopwatchRunning) {
+      pauseStopwatch()
+      setShowControls(true)
+    } else {
+      startStopwatch()
+      setShowControls(false)
     }
   }
-
+}
   // STAGE 1: Setup Mode - Scrollable with proper container
   if (!isInTimingMode) {
     return (
@@ -614,17 +674,58 @@ function TimerPage() {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center space-y-8">
           {/* Main Timer Display - Clickable */}
-          <div 
-            className="text-6xl sm:text-8xl md:text-9xl lg:text-[12rem] xl:text-[14rem] font-mono font-bold text-primary cursor-pointer select-none leading-none"
-            onClick={handleTimingModeClick}
-            title="Click to pause/resume"
-          >
-            {activeTab === 'timer'
-              ? `${timerMinutes.toString().padStart(2, '0')}:${timerSeconds.toString().padStart(2, '0')}`
-              : formatTime(stopwatchTime)
-            }
-          </div>
 
+    {/* Main Timer Display - Clickable */}
+<div 
+  className="text-6xl sm:text-8xl md:text-9xl lg:text-[12rem] xl:text-[14rem] font-mono font-bold text-primary cursor-pointer select-none leading-none"
+  onClick={handleTimingModeClick}
+  title="Click to pause/resume"
+>
+  {activeTab === 'timer'
+    ? `${timerMinutes.toString().padStart(2, '0')}:${timerSeconds.toString().padStart(2, '0')}`
+    : formatTime(stopwatchTime)
+  }
+</div>
+
+{/* Time Adjuster - Only for timer when paused and not used yet */}
+{activeTab === 'timer' && showControls && !hasUsedRandomAdjust && (
+  <div className="flex flex-col items-center space-y-4 bg-card/50 backdrop-blur-sm p-4 rounded-lg border">
+    <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-2">
+        <input
+          type="number"
+          min="1"
+          max="10"
+          value={timeAdjustment}
+          onChange={(e) => setTimeAdjustment(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+          className="w-16 px-2 py-1 text-center border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          placeholder="5"
+        />
+        <span className="text-sm text-muted-foreground">max min</span>
+      </div>
+      
+      <button
+        onClick={adjustTime}
+        className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        title={`Randomly adjust time by ±${timeAdjustment} minutes`}
+      >
+        <span className="text-sm font-bold">🎲 Random Time</span>
+      </button>
+    </div>
+    <p className="text-xs text-muted-foreground text-center">
+      Will randomly add or subtract 1-{timeAdjustment} minutes (one time only)
+    </p>
+  </div>
+)}
+
+{/* Show last adjustment badge */}
+{lastAdjustment !== null && (
+  <div className={`px-3 py-1 rounded-full text-sm font-bold ${
+    lastAdjustment >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+  }`}>
+    {lastAdjustment >= 0 ? '+' : ''}{lastAdjustment} minutes
+  </div>
+)}
           {/* Controls - Only show when paused */}
           {showControls && (
             <div className="flex justify-center space-x-4">
