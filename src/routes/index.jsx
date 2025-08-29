@@ -555,7 +555,7 @@ const handleTimingModeClick = () => {
                 className="w-full px-4 py-3 text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 {userTags.map(tag => (
-                  <option key={tag} value={tag}>{tag}</option>
+                  <option key={tag} value={tag} className='text-black dark:text-white dark:bg-zinc-800'>{tag}</option>
                 ))}
               </select>
 
